@@ -1,0 +1,80 @@
+name: Build and deploy to production
+
+# Secrets: SSH_PRIVATE_KEY, SSH_USER, SSH_HOST, SSH_PATH, SLACK_WEBHOOK
+
+on: 
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Slack Notification - Deployment Started
+        uses: rtCamp/action-slack-notify@v2
+        if: always()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_USERNAME: Github
+          SLACK_ICON: https://www.example.com/uploads/assets/slack-icon.png
+          SLACK_COLOR: '#1B7FBA'
+          SLACK_TITLE: '🔵 example.com Github Deployment has started'
+          SLACK_FOOTER: '<https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}|View Run>'
+        
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Install PHP dependencies via Composer
+        uses: php-actions/composer@v6
+        env: 
+          COMPOSER: composer.json
+        with:
+          php_version: '8.1'
+          args: "--no-interaction --no-progress --optimize-autoloader"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          #node-version-file: '.nvmrc'
+          node-version: "20"
+
+      - name: Install js dependancies via NPM
+        run: npm ci
+
+      - name: Build assets via Laravel Mix
+        run: npx mix --production
+
+      - name: Add Private SSH Key
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy public_html via Rsync
+        run: |
+          rsync -avzh --chmod=F664,D775 --delete-after --exclude-from='.rsyncignore' -e "ssh -p 22 -o StrictHostKeyChecking=no" ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.SSH_PATH }}
+      
+      - name: Slack Notification - Deployment Failed
+        uses: rtCamp/action-slack-notify@v2
+        if: failure()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_USERNAME: Github
+          SLACK_ICON: https://www.example.com/uploads/assets/slack-icon.png
+          SLACK_COLOR: '#A94442'
+          SLACK_TITLE: '🔴 example.com Github Deployment has failed'
+          SLACK_FOOTER: '<https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}|View Run>'
+
+      - name: Slack Notification - Deployment Succeeded
+        uses: rtCamp/action-slack-notify@v2
+        if: success()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_USERNAME: Github
+          SLACK_ICON: https://www.example.com/uploads/assets/slack-icon.png
+          SLACK_COLOR: '#3B763D'
+          SLACK_TITLE: '🟢 example.com Github Deployment succeeded'
+          SLACK_FOOTER: '<https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}|View Run>'
