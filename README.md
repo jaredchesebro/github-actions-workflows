@@ -39,6 +39,7 @@ You must add all your secrets to Github prior to running the workflow or it will
 - `SLACK_WEBHOOK`: The slack webhook to deliver success/failure messages to.
 
 **.rsyncignore**
+
 This file is used to tell rsync which files to ignore. It prevents deployment of files, and protects them on the destination server. The following are just examples, not exhaustive lists. See the `.rsyncignore` file for more examples.
 
 Examples of files you don't want to deploy:
